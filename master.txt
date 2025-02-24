@@ -1,0 +1,81 @@
+import serial
+import time
+import re
+
+# Parse the LDF file to extract nodes, frames, and schedules
+def parse_ldf(file_path):
+    ldf_data = {
+        "nodes": [],
+        "frames": [],
+        "schedule_tables": [],
+    }
+
+    with open(file_path, 'r') as f:
+        data = f.read()
+
+    # Remove comments (everything after "//" or after "\n" for inline comments)
+    data = re.sub(r'//.*', '', data)
+
+    # Parse Nodes
+    nodes_pattern = r"Slaves:\s*\{([^}]+)\}"
+    nodes_match = re.search(nodes_pattern, data)
+    if nodes_match:
+        ldf_data["nodes"] = [node.strip() for node in nodes_match.group(1).split(';') if node.strip()]
+
+    # Parse Frames
+    frames_pattern = r"Frames:\s*\{([^}]+)\}"
+    frames_match = re.search(frames_pattern, data)
+    if frames_match:
+        frames = frames_match.group(1).split(';')
+        for frame in frames:
+            if frame.strip():
+                ldf_data["frames"].append(frame.strip())
+
+    # Parse Schedule Tables
+    schedule_pattern = r"Schedule_tables:\s*\{([^}]+)\}"
+    schedule_match = re.search(schedule_pattern, data)
+    if schedule_match:
+        schedules = schedule_match.group(1).split(';')
+        for schedule in schedules:
+            if schedule.strip():
+                ldf_data["schedule_tables"].append(schedule.strip())
+
+    return ldf_data
+
+# Configure UART to LIN module on Raspberry Pi
+uart_port = '/dev/ttyAMA0'  # Adjust to your Raspberry Pi's UART port
+baud_rate = 9600  # Typically 19200 for LIN
+ser = serial.Serial(uart_port, baud_rate, timeout=1)
+
+# Parse the LDF file
+ldf_path = 'schedule.ldf'
+parsed_data = parse_ldf(ldf_path)
+
+# Print parsed LDF data to check
+print(parsed_data)
+
+# Function to send a "Hello" message to a slave
+def send_hello_to_slave(slave_id):
+    hello_message = bytes([slave_id])  # Just sending the slave ID as the "Hello" message
+    ser.write(hello_message)
+
+# Main loop: Send messages to slaves based on the schedule table
+def main():
+    schedule = parsed_data["schedule_tables"]
+    while True:
+        for item in schedule:
+            # Split the frame and delay correctly
+            try:
+                frame, delay = item.split(',')
+                frame = frame.strip()  # e.g., Frame_Hello_1
+                delay = int(delay.strip().replace('ms', '')) / 1000.0  # Convert ms to seconds
+                if frame == 'Frame_Hello_1':
+                    send_hello_to_slave(0x01)  # Slave 1
+                elif frame == 'Frame_Hello_2':
+                    send_hello_to_slave(0x02)  # Slave 2
+                time.sleep(delay)
+            except ValueError:
+                print(f"Skipping invalid schedule entry: {item}")
+
+if __name__ == '__main__':
+    main()

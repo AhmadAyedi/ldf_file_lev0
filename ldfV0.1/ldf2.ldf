@@ -1,0 +1,43 @@
+LIN_description_file;
+
+LIN_protocol_version = "2.1";
+LIN_language_version = "2.1";
+
+Node_attribute {
+    Master: MasterNode;
+    Slave: SlaveNode1, SlaveNode2;
+}
+
+Frame {
+    frame1: 8 bytes;
+    frame2: 8 bytes;
+}
+
+Signal {
+    Signal1: 8 bits in frame1;
+    Signal2: 8 bits in frame2;
+}
+
+Schedule_table {
+    schedule1 {
+        Cmd: "publish" frame1 50 ms;
+        Cmd: "publish" frame2 50 ms;
+    }
+}
+
+Node {
+    MasterNode {
+        LIN_master;
+        schedule_table = schedule1;
+    }
+    
+    SlaveNode1 {
+        LIN_slave;
+        response_frame = frame1;
+    }
+    
+    SlaveNode2 {
+        LIN_slave;
+        response_frame = frame2;
+    }
+}
